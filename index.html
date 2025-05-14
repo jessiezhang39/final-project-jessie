@@ -1,0 +1,288 @@
+<script src="https://cdn.jsdelivr.net/gh/netizenorg/netnet-standard-library/build/nn.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.15/paper-full.min.js"></script>
+<script>
+
+  
+/* global nn */
+let music1, music2, bgmusic, stopTimer;
+
+// pick a letter’s audio offset/duration
+const samples = {
+  s: { offset: 0.4224925139783237, duration: 1.641685197172915 },
+  d: { offset: 2.836735450997316, duration: 1.4847594062666811 },
+  f: { offset: 5.244942780673761, duration: 1.4968306209517754 },
+  j: { offset: 0.5047509454533065, duration: 1.8382904803546354 },
+  k: { offset: 2.916338795952438, duration: 1.732355096740977 },
+  l: { offset: 5.346621125912803, duration: 1.6575771788960436 },
+};
+
+
+const COLORS     = ['red','blue','white', 'yellow'];
+const movingSquares = [];
+
+let isDrawingLine = false;
+let startX = 0, startY = 0;
+let lineDiv = null;
+  
+const min = 10;
+const max = 20;
+const randomHeight = Math.random() * (max - min) + min;
+
+function mouseDown(e) {
+  isDrawingLine = true;
+  startX = e.clientX;
+  startY = e.clientY;
+  lineDiv = nn.create('div')
+    .css({
+      position: 'absolute',
+      backgroundColor: 'yellow',
+      zIndex:0
+    })
+    .addTo('body');
+}
+
+function mouseMove(e) {
+  if (!isDrawingLine) return;
+  const dx = e.clientX - startX;
+  const dy = e.clientY - startY;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    // Horizontal line
+    const width = Math.abs(dx);
+    const left  = dx > 0 ? startX : e.clientX;
+    const top   = startY - 5;  // line thickness 10px
+    lineDiv.css({
+      left:   `${left}px`,
+      top:    `${top}px`,
+      width:  `${width}px`,
+      height: `${randomHeight}px`
+    });
+  } else {
+    // Vertical line
+    const height = Math.abs(dy);
+    const top    = dy > 0 ? startY : e.clientY;
+    const left   = startX - 5;
+    lineDiv.css({
+      left:   `${left}px`,
+      top:    `${top}px`,
+      width:  `${randomHeight}px`,
+      height: `${height}px`
+    });
+  }
+}
+
+function mouseUp(e) {
+  if (!isDrawingLine) return;
+  mouseMove(e);
+  isDrawingLine = false;
+  lineDiv = null;
+}
+
+
+function spawnSquare() {
+  const size     = 20 + Math.random()*80;
+  const color    = COLORS[Math.floor(Math.random()*4)];
+  const duration = 2 + Math.random()*3;  // sec
+  let startX, startY, dx, dy;
+
+  switch (Math.floor(Math.random()*4)) {
+    case 0: // top
+      startX = Math.random()*nn.width; startY = -size;
+      dx = 0; dy = nn.height + size*2; break;
+    case 1: // right
+      startX = nn.width + size; startY = Math.random()*nn.height;
+      dx = -nn.width - size*2; dy = 0;  break;
+    case 2: // bottom
+      startX = Math.random()*nn.width; startY = nn.height + size;
+      dx = 0; dy = -nn.height - size*2; break;
+    default: // left
+      startX = -size; startY = Math.random()*nn.height;
+      dx = nn.width + size*2; dy = 0;
+  }
+
+  const sq = nn.create('div')
+    .css({
+      position:        'absolute',
+      width:           size  + 'px',
+      height:          size  + 'px',
+      left:            startX+ 'px',
+      top:             startY+ 'px',
+      backgroundColor: color,
+      transition:      `transform ${duration}s linear`,
+      transform:       'translate(0,0)',
+    })
+    .addTo('body');
+
+
+  setTimeout(() => {
+    sq.css({ transform: `translate(${dx}px,${dy}px)` });
+  }, 20);
+
+
+  const removal = setTimeout(() => sq.remove(), duration*1000 + 100);
+  movingSquares.push({ el: sq, timer: removal });
+}
+
+function freezeSquares() {
+  movingSquares.forEach(({ el, timer }) => {
+    clearTimeout(timer);
+    const tf = window.getComputedStyle(el).transform;
+    el.css({ transition: 'none', transform: tf });
+  });
+  movingSquares.length = 0;
+}
+
+function playSample(e) {
+  const k = e.key.toLowerCase();
+  if (samples[k]) {
+    const s = samples[k];
+    music1.currentTime = s.offset;
+    music1.play();
+    if (stopTimer) clearTimeout(stopTimer);
+    stopTimer = setTimeout(() => music1.pause(), s.duration*1000);
+    music2.currentTime = s.offset;
+    music2.play();
+    if (stopTimer) clearTimeout(stopTimer);
+    stopTimer = setTimeout(() => music2.pause(), s.duration*1000);
+    spawnSquare();
+  }
+  else if (k === ' ') {
+    freezeSquares();
+  }
+}
+
+function fileLoaded() {
+ 
+  const splash = nn.create('div')
+    .content("Mondrian’s Broadway Boogie Woogie reimagined!\nPress START to draw.")
+    .css({
+      position:   'absolute',
+      top:        '50%',
+      left:       '50%',
+      width:      '80vw',
+      height:     '80vh',
+      transform:  'translate(-50%,-50%)',
+      textAlign:  'center',
+      justifyContent:  'center',
+      padding:    '1rem 2rem',
+      fontFamily: 'Garamond, serif',
+      fontSize:   '1.5rem',
+      color:      'white',
+      borderRadius:  '10px',
+      boxShadow:     '0 4px 20px rgba(0,0,0,0.3)',
+      textShadow:    '1px 1px 4px rgba(0,0,0,0.6)',
+      backgroundImage:'url("mondrian.jpg")',
+      backgroundPosition: 'center',
+      display: 'flex',
+      flexDirection:   'column'
+    })
+    .addTo('body');
+
+  const startBtn = nn.create('button')
+    .content('START')
+    .css({
+      position:   'absolute',
+      top:        '65%',
+      left:       '50%',
+      transform:  'translateX(-50%)',
+      padding:    '0.5rem 1rem',
+      fontFamily: 'Garamond, serif',
+      fontSize:   '1rem',
+      zIndex:     1001,
+      cursor:     'pointer'
+    })
+    .addTo('body');
+  
+  startBtn.on('click', () => {
+    // remove splash and button
+    bgmusic.play()
+    splash.remove();
+    startBtn.remove();
+
+    // now show the step list
+    showSteps();
+  });
+
+function showSteps() {
+  const steps = nn.create('div')
+    .content(`
+Step 1: Click & drag to customize NYC gridlines
+Step 2: Press 🆂🅳🅵 🅹🅺🅻 to move your traffic squares  
+Step 3: Hit Space to freeze the flow
+    `)
+    .css({
+      position:   'absolute',
+      top:        '50%',
+      left:       '50%',
+      transform:  'translate(-50%,-50%)',
+      whiteSpace: 'pre-wrap',
+      textAlign:  'left',
+      lineHeight: '1.5',
+      padding:    '1rem 2rem',
+      fontFamily: 'Garamond, serif',
+      fontSize:   '1.2rem',
+      color:      '#fff',
+      background: 'rgba(0,0,0,0.4)',
+      borderRadius:'8px',
+      zIndex:     1000
+    })
+    .addTo('body');
+
+  // Fade out after 4s
+  setTimeout(() => {
+    steps.css({ transition: 'opacity 1s ease', opacity: 0 });
+  }, 4000);
+}
+
+  
+  nn.create('button')
+  .content('Clear Grid')
+  .css({
+    position:   'absolute',
+    top:        '10px',
+    right:      '10px',
+    padding:    '0.5rem 1rem',
+    fontSize:   '0.9rem',
+    zIndex:     999
+  })
+  .on('click', () => document.querySelectorAll('div').forEach(d => {
+    if (d.style.backgroundColor === 'yellow') d.remove();
+  }))
+    .addTo('body');
+}
+
+
+function setup() {
+  nn.get('body').css({
+    userSelect:    'none',
+    margin:        0,
+    overflow:      'hidden',
+    height:        '100vh',
+    background:    'white',
+    display:       'flex',
+    justifyContent:'center',
+    alignItems:    'center',
+    position:      'relative',
+  });
+
+  bgmusic = nn.create('audio')
+            .set('src', 'patterns__i_chord_-_level_1.mp3')
+            .addTo('body')
+  
+  music1 = nn.create('audio')
+    .set('src', 'Blues Piano Chords Level 1 - Spread Chords.mp3')
+    .addTo('body')
+  music2 = nn.create('audio')
+    .set('src', 'Blues Piano Chords Level 2- Extended Chords.mp3')
+    .addTo('body')
+    .on('loadeddata', fileLoaded);
+ 
+}
+
+nn.on('load', setup)
+nn.on('keypress', playSample)
+nn.on('mousedown', mouseDown)
+nn.on('mousemove', mouseMove)
+nn.on('mouseup', mouseUp)
+
+</script>
